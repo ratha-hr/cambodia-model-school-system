@@ -31,3 +31,12 @@ dist-ssr
 
 # Vercel
 .vercel
+
+# Scratch / temp
+*.tmp
+names_in_file.txt
+pf_headers.json
+seed_data.json
+students_full.json
+src_recovered_ts/
+extract_excel.py
