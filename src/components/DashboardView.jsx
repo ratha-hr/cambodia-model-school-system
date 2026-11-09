@@ -18,7 +18,9 @@ import {
   HeartHandshake, 
   GraduationCap,
   ClipboardPaste,
-  PhoneCall
+  PhoneCall,
+  FolderGit2,
+  Landmark
 } from 'lucide-react';
 import { calculateRankings, toKhmerNum } from '../utils/gradeCalculations';
 import { exportToMoEYSExcel } from '../utils/excelHandler';
@@ -34,6 +36,7 @@ export default function DashboardView({
   onOpenPasteModal,
   onOpenCertificateModal,
   onOpenStudentModal,
+  onOpenGitHubSync,
   attendanceRecords = {}
 }) {
   const monthGrades = grades[currentMonth.id] || {};
@@ -142,6 +145,24 @@ export default function DashboardView({
 
           {/* Quick Action Buttons inside Hero */}
           <div className="flex flex-wrap items-center gap-2.5">
+            <button
+              onClick={() => onNavigateTab('classroom')}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white shadow-md shadow-indigo-600/30 transition transform hover:-translate-y-0.5"
+            >
+              <Landmark className="w-4 h-4" />
+              <span>ការងារបន្ទុកថ្នាក់</span>
+            </button>
+
+            {onOpenGitHubSync && (
+              <button
+                onClick={onOpenGitHubSync}
+                className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold bg-white/15 hover:bg-white/25 text-white border border-white/25 shadow-md transition transform hover:-translate-y-0.5"
+              >
+                <FolderGit2 className="w-4 h-4 text-emerald-400" />
+                <span>GitHub Database</span>
+              </button>
+            )}
+
             <button
               onClick={() => onNavigateTab('excel')}
               className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold bg-blue-500 hover:bg-blue-600 text-white shadow-md shadow-blue-500/30 transition transform hover:-translate-y-0.5"

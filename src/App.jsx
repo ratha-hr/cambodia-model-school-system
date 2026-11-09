@@ -15,7 +15,10 @@ import {
   Upload,
   RefreshCw,
   Printer,
-  ClipboardPaste
+  ClipboardPaste,
+  FolderGit2,
+  Landmark,
+  CheckCircle2
 } from 'lucide-react';
 import initialData from './data/initialData.json';
 import DashboardView from './components/DashboardView';
@@ -30,8 +33,11 @@ import StudentProfileModal from './components/StudentProfileModal';
 import SettingsModal from './components/SettingsModal';
 import ExcelPasteModal from './components/ExcelPasteModal';
 import CertificateOfHonorModal from './components/CertificateOfHonorModal';
+import ClassroomManagementView from './components/ClassroomManagementView';
+import GitHubSyncModal from './components/GitHubSyncModal';
 import { exportToMoEYSExcel } from './utils/excelHandler';
 import { calculateRankings, toKhmerNum } from './utils/gradeCalculations';
+import { getGitHubConfig, saveGitHubConfig, saveDatabaseToGitHub } from './utils/githubDatabase';
 
 const LOCAL_STORAGE_KEY = 'moeys_class_data_v2';
 
@@ -41,7 +47,20 @@ export default function App() {
     try {
       const saved = localStorage.getItem(LOCAL_STORAGE_KEY);
       if (saved) {
-        return JSON.parse(saved);
+        const parsed = JSON.parse(saved);
+        // Ensure new properties from 7A.xlsm exist even if user had older localStorage
+        return {
+          ...initialData,
+          ...parsed,
+          teachers: parsed.teachers || initialData.teachers,
+          council: parsed.council || initialData.council,
+          inventory: parsed.inventory || initialData.inventory,
+          classFunds: parsed.classFunds || initialData.classFunds,
+          nutrition: parsed.nutrition || initialData.nutrition,
+          actionPlans: parsed.actionPlans || initialData.actionPlans,
+          cleaningDuty: parsed.cleaningDuty || initialData.cleaningDuty,
+          timetable: parsed.timetable || initialData.timetable
+        };
       }
     } catch (e) {
       console.error('Error reading localStorage', e);
@@ -73,8 +92,8 @@ export default function App() {
     return base;
   });
 
-  // Default active tab is now 'dashboard' (ផ្ទាំងគ្រប់គ្រង)
-  const [activeTab, setActiveTab] = useState('dashboard'); // 'dashboard', 'excel', 'students', 'attendance', 'honor', 'reports', 'standards', 'timetable'
+  // Default active tab is 'dashboard' (ផ្ទាំងគ្រប់គ្រង)
+  const [activeTab, setActiveTab] = useState('dashboard');
   const [currentMonth, setCurrentMonth] = useState(data.months[0]);
   
   // Modals state
@@ -82,6 +101,12 @@ export default function App() {
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [isPasteModalOpen, setIsPasteModalOpen] = useState(false);
   const [isCertificateModalOpen, setIsCertificateModalOpen] = useState(false);
+  const [isGitHubModalOpen, setIsGitHubModalOpen] = useState(false);
+
+  // GitHub DB Config & Quick Sync State
+  const [gitHubConfig, setGitHubConfig] = useState(() => getGitHubConfig());
+  const [isQuickSyncing, setIsQuickSyncing] = useState(false);
+  const [quickSyncSuccess, setQuickSyncSuccess] = useState(false);
 
   // Auto-save to localStorage
   useEffect(() => {
@@ -91,6 +116,27 @@ export default function App() {
       console.error('Error saving to localStorage', e);
     }
   }, [data]);
+
+  // Quick Sync handler for top bar button
+  const handleQuickSync = async () => {
+    if (!gitHubConfig.token) {
+      setIsGitHubModalOpen(true);
+      return;
+    }
+    setIsQuickSyncing(true);
+    const msg = `Auto quick-sync (${new Date().toLocaleTimeString('km-KH')})`;
+    const res = await saveDatabaseToGitHub(gitHubConfig, data, msg);
+    setIsQuickSyncing(false);
+    if (res.success) {
+      const updated = { ...gitHubConfig, lastSyncedAt: new Date().toISOString(), lastCommitSha: res.commitSha };
+      setGitHubConfig(updated);
+      saveGitHubConfig(updated);
+      setQuickSyncSuccess(true);
+      setTimeout(() => setQuickSyncSuccess(false), 3000);
+    } else {
+      setIsGitHubModalOpen(true);
+    }
+  };
 
   // Update a single score
   const handleUpdateScore = (monthId, studentId, subjectId, score) => {
@@ -184,6 +230,16 @@ export default function App() {
     setData(prev => ({ ...prev, info: newInfo }));
   };
 
+  // Apply remote database from GitHub
+  const handleApplyRemoteData = (remoteData) => {
+    setData(remoteData);
+    try {
+      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(remoteData));
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
   // Calculate current month rankings for certificates and dashboard
   const currentMonthRankings = calculateRankings(
     data.students,
@@ -225,6 +281,32 @@ export default function App() {
             {/* Quick Actions on Top Right */}
             <div className="flex items-center gap-2">
               
+              {/* GitHub Database Status & Sync Button */}
+              <button
+                onClick={handleQuickSync}
+                disabled={isQuickSyncing}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition ${
+                  quickSyncSuccess 
+                    ? 'bg-emerald-100 text-emerald-800 border-emerald-400'
+                    : gitHubConfig.token
+                    ? 'bg-indigo-50 text-indigo-800 hover:bg-indigo-100 border-indigo-300'
+                    : 'bg-slate-100 text-slate-700 hover:bg-slate-200 border-slate-300'
+                }`}
+                title="ភ្ជាប់ Database លើ GitHub និង Sync ទិន្នន័យ"
+              >
+                <FolderGit2 className={`w-3.5 h-3.5 ${isQuickSyncing ? 'animate-spin text-blue-600' : 'text-indigo-600'}`} />
+                <span className="hidden sm:inline">
+                  {quickSyncSuccess ? 'Sync រួចរាល់!' : isQuickSyncing ? 'កំពុង Sync...' : 'GitHub Database'}
+                </span>
+                <span className={`w-2 h-2 rounded-full ${
+                  quickSyncSuccess
+                    ? 'bg-emerald-500'
+                    : gitHubConfig.token
+                    ? 'bg-emerald-500 animate-pulse'
+                    : 'bg-amber-400'
+                }`} />
+              </button>
+
               {/* Excel Paste Button */}
               <button
                 onClick={() => setIsPasteModalOpen(true)}
@@ -245,7 +327,7 @@ export default function App() {
                 <span>ប័ណ្ណសរសើរ</span>
               </button>
 
-              {/* Student Count / Modal Button */}
+              {/* Student Count / Tab Button */}
               <button
                 onClick={() => setActiveTab('students')}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 transition"
@@ -281,6 +363,7 @@ export default function App() {
             <nav className="flex space-x-1 sm:space-x-1.5 overflow-x-auto py-2">
               {[
                 { id: 'dashboard', label: 'ផ្ទាំងគ្រប់គ្រង', icon: LayoutDashboard },
+                { id: 'classroom', label: 'ការងារបន្ទុកថ្នាក់ (៧A)', icon: Landmark },
                 { id: 'excel', label: 'តារាងស្រង់ពិន្ទុ (Excel Grid)', icon: FileSpreadsheet },
                 { id: 'students', label: 'ពត៌មានសិស្ស', icon: Users },
                 { id: 'attendance', label: 'វត្តមាន & ហានិភ័យបោះបង់', icon: UserCheck },
@@ -327,11 +410,25 @@ export default function App() {
             onOpenPasteModal={() => setIsPasteModalOpen(true)}
             onOpenCertificateModal={() => setIsCertificateModalOpen(true)}
             onOpenStudentModal={() => setIsStudentModalOpen(true)}
+            onOpenGitHubSync={() => setIsGitHubModalOpen(true)}
             attendanceRecords={data.attendance?.[currentMonth.id] || {}}
           />
         )}
 
-        {/* Tab 2: Excel Score Grid */}
+        {/* Tab 2: Classroom Management View (From 7A.xlsm Sheets Co, T, F, Food, Sheet1 (2), Table1, Table2) */}
+        {activeTab === 'classroom' && (
+          <ClassroomManagementView
+            info={data.info}
+            teachers={data.teachers || []}
+            council={data.council || {}}
+            inventory={data.inventory || []}
+            classFunds={data.classFunds || { totalBudget: 0, targetBudget: 2000000, records: [] }}
+            nutrition={data.nutrition || []}
+            actionPlans={data.actionPlans || { yearly: [], weekly: [] }}
+          />
+        )}
+
+        {/* Tab 3: Excel Score Grid */}
         {activeTab === 'excel' && (
           <ExcelSpreadsheetGrid
             info={data.info}
@@ -348,7 +445,7 @@ export default function App() {
           />
         )}
 
-        {/* Tab 3: Student Information Registry */}
+        {/* Tab 4: Student Information Registry */}
         {activeTab === 'students' && (
           <StudentRegistryView
             info={data.info}
@@ -359,7 +456,7 @@ export default function App() {
           />
         )}
 
-        {/* Tab 4: Attendance Tracker */}
+        {/* Tab 5: Attendance Tracker */}
         {activeTab === 'attendance' && (
           <AttendanceTracker
             info={data.info}
@@ -370,7 +467,7 @@ export default function App() {
           />
         )}
 
-        {/* Tab 5: Honor Roll & Remedial */}
+        {/* Tab 6: Honor Roll & Remedial */}
         {activeTab === 'honor' && (
           <HonorRollAndRemedial
             info={data.info}
@@ -382,7 +479,7 @@ export default function App() {
           />
         )}
 
-        {/* Tab 6: Report Cards */}
+        {/* Tab 7: Report Cards */}
         {activeTab === 'reports' && (
           <ReportCardView
             info={data.info}
@@ -393,7 +490,7 @@ export default function App() {
           />
         )}
 
-        {/* Tab 7: Model School Standards */}
+        {/* Tab 8: Model School Standards */}
         {activeTab === 'standards' && (
           <ModelSchoolStandardsView
             info={data.info}
@@ -402,7 +499,7 @@ export default function App() {
           />
         )}
 
-        {/* Tab 8: Timetable & Green Duty */}
+        {/* Tab 9: Timetable & Green Duty */}
         {activeTab === 'timetable' && (
           <TimetableAndDuty
             info={data.info}
@@ -427,6 +524,10 @@ export default function App() {
           info={data.info}
           onSaveInfo={handleSaveInfo}
           onResetDefault={handleResetDefault}
+          onOpenGitHubConfig={() => {
+            setIsSettingsModalOpen(false);
+            setIsGitHubModalOpen(true);
+          }}
           onClose={() => setIsSettingsModalOpen(false)}
         />
       )}
@@ -449,6 +550,16 @@ export default function App() {
           rankings={currentMonthRankings}
           currentMonth={currentMonth}
           onClose={() => setIsCertificateModalOpen(false)}
+        />
+      )}
+
+      {/* GitHub Database & Hosting Modal */}
+      {isGitHubModalOpen && (
+        <GitHubSyncModal
+          currentData={data}
+          onApplyRemoteData={handleApplyRemoteData}
+          onClose={() => setIsGitHubModalOpen(false)}
+          onSyncSuccess={(cfg) => setGitHubConfig(cfg)}
         />
       )}
 

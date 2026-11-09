@@ -40,3 +40,5 @@ seed_data.json
 students_full.json
 src_recovered_ts/
 extract_excel.py
+excel_summary.txt
+extracted_data.json

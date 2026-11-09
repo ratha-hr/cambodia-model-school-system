@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { Settings, X, Save } from 'lucide-react';
+import { Settings, X, Save, FolderGit2 } from 'lucide-react';
 
 export default function SettingsModal({
   info,
   onSaveInfo,
   onResetDefault,
+  onOpenGitHubConfig,
   onClose
 }) {
   const [formData, setFormData] = useState({ ...info });
@@ -35,6 +36,26 @@ export default function SettingsModal({
 
         {/* Form Body */}
         <form onSubmit={handleSubmit} className="p-6 space-y-4 text-xs">
+          {/* Quick GitHub Database access banner */}
+          <div className="p-3 rounded-xl bg-indigo-50 border border-indigo-200 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <FolderGit2 className="w-4 h-4 text-indigo-600" />
+              <div>
+                <span className="font-bold text-indigo-950 block text-xs">Cloud Database (GitHub Storage)</span>
+                <span className="text-[10px] text-indigo-700">គ្រប់គ្រងការតភ្ជាប់ Token, Repo និង Version History</span>
+              </div>
+            </div>
+            {onOpenGitHubConfig && (
+              <button
+                type="button"
+                onClick={onOpenGitHubConfig}
+                className="px-3 py-1 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg text-xs transition"
+              >
+                កំណត់ GitHub DB
+              </button>
+            )}
+          </div>
+
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block text-slate-600 font-medium mb-1">ឈ្មោះសាលារៀន</label>
